@@ -1028,6 +1028,8 @@ public static class RoslynTools
         [Description("Include method call relationships")] bool includeMethodCalls = true,
         [Description("Include field/property access relationships")] bool includeFieldAccess = true,
         [Description("Include namespace relationships")] bool includeNamespaces = true,
+        [Description("Include XAML analysis")] bool includeXaml = false,
+        [Description("Include SQL analysis")] bool includeSql = false,
         [Description("Maximum depth for relationship traversal")] int maxDepth = 3)
     {
         try
@@ -1138,6 +1140,200 @@ public static class RoslynTools
                 Console.Error.WriteLine($"Inner stack trace: {ex.InnerException.StackTrace}");
             }
             return $"Error extracting symbol graph: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Break down multi-language code into semantically meaningful chunks spanning C#, XAML, and SQL.")]
+    public static async Task<string> ChunkMultiLanguageCode(
+        [Description("Path to the C# file or project")] string path,
+        [Description("Chunking strategy: 'feature', 'dataaccess', 'mvvm', 'component'")] string strategy = "feature",
+        [Description("Include dependency relationships")] bool includeDependencies = true,
+        [Description("Include XAML analysis")] bool includeXaml = false,
+        [Description("Include SQL analysis")] bool includeSql = false)
+    {
+        try
+        {
+            Console.Error.WriteLine($"ChunkMultiLanguageCode called with path: '{path}', strategy: '{strategy}'");
+
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            // Validate strategy parameter
+            var validStrategies = new[] { "feature", "dataaccess", "mvvm", "component" };
+            if (!validStrategies.Contains(strategy.ToLowerInvariant()))
+            {
+                return $"Error: Invalid strategy '{strategy}'. Valid values are: {string.Join(", ", validStrategies)}";
+            }
+
+            // Create multi-language chunker service
+            var chunker = new MultiLanguageChunker();
+            
+            // Perform chunking
+            var result = await chunker.ChunkMultiLanguageCodeAsync(systemPath, strategy, includeDependencies, includeXaml, includeSql);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in ChunkMultiLanguageCode: {ex.Message}");
+            return $"Error chunking multi-language code: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Extract SQL queries and database operations from C# code.")]
+    public static async Task<string> ExtractSqlFromCode(
+        [Description("Path to the C# file")] string filePath)
+    {
+        try
+        {
+            Console.Error.WriteLine($"ExtractSqlFromCode called with path: '{filePath}'");
+
+            // Normalize file path
+            string normalizedPath = filePath.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create SQL extractor service
+            var extractor = new SqlExtractor();
+            
+            // Extract SQL metadata
+            var result = await extractor.ExtractSqlFromFileAsync(systemPath);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in ExtractSqlFromCode: {ex.Message}");
+            return $"Error extracting SQL from code: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Analyze XAML files for UI structure, data bindings, and resources.")]
+    public static async Task<string> AnalyzeXamlFile(
+        [Description("Path to the XAML file")] string filePath)
+    {
+        try
+        {
+            Console.Error.WriteLine($"AnalyzeXamlFile called with path: '{filePath}'");
+
+            // Normalize file path
+            string normalizedPath = filePath.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            if (!systemPath.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"Error: File {systemPath} is not a XAML file.";
+            }
+
+            // Create XAML analyzer service
+            var analyzer = new XamlAnalyzer();
+            
+            // Analyze XAML file
+            var result = await analyzer.AnalyzeXamlFileAsync(systemPath);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in AnalyzeXamlFile: {ex.Message}");
+            return $"Error analyzing XAML file: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Analyze MVVM relationships between Views, ViewModels, and Models in a project.")]
+    public static async Task<string> AnalyzeMvvmRelationships(
+        [Description("Path to the project file or a file within the project")] string projectPath)
+    {
+        try
+        {
+            Console.Error.WriteLine($"AnalyzeMvvmRelationships called with path: '{projectPath}'");
+
+            // Normalize file path
+            string normalizedPath = projectPath.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            // Determine if this is a project file or a source file
+            string actualProjectPath;
+            if (systemPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!File.Exists(systemPath))
+                {
+                    return $"Error: Project file {systemPath} does not exist.";
+                }
+                actualProjectPath = systemPath;
+            }
+            else
+            {
+                // Try to find containing project
+                actualProjectPath = await Program.FindContainingProjectAsync(systemPath);
+                if (string.IsNullOrEmpty(actualProjectPath))
+                {
+                    return "Error: Could not find a project file. Please provide a .csproj file path or a file within a project.";
+                }
+            }
+
+            // Create XAML analyzer service
+            var analyzer = new XamlAnalyzer();
+            
+            // Analyze MVVM relationships
+            var result = await analyzer.AnalyzeMvvmRelationshipsAsync(actualProjectPath);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in AnalyzeMvvmRelationships: {ex.Message}");
+            return $"Error analyzing MVVM relationships: {ex.Message}";
         }
     }
 }
