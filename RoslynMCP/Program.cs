@@ -887,6 +887,138 @@ public static class RoslynTools
 
         return workspace;
     }
+
+    [McpServerTool, Description("Break down C# code into semantically meaningful chunks for analysis.")]
+    public static async Task<string> ChunkCodeBySemantics(
+        [Description("Path to the C# file or project")] string path,
+        [Description("Chunking strategy: 'class', 'method', 'feature', 'namespace'")] string strategy = "class",
+        [Description("Include dependency relationships")] bool includeDependencies = true)
+    {
+        try
+        {
+            Console.Error.WriteLine($"ChunkCodeBySemantics called with path: '{path}', strategy: '{strategy}'");
+
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create chunker service
+            var chunker = new CodeChunker();
+            
+            // Perform chunking
+            var result = await chunker.ChunkCodeAsync(systemPath, strategy, includeDependencies);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in ChunkCodeBySemantics: {ex.Message}");
+            return $"Error chunking code: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Analyze code structure, patterns, and architectural metrics.")]
+    public static async Task<string> AnalyzeCodeStructure(
+        [Description("Path to the C# file or project")] string path,
+        [Description("Include design pattern detection")] bool detectPatterns = true,
+        [Description("Calculate complexity metrics")] bool calculateMetrics = true)
+    {
+        try
+        {
+            Console.Error.WriteLine($"AnalyzeCodeStructure called with path: '{path}'");
+
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create structure analyzer service
+            var analyzer = new StructureAnalyzer();
+            
+            // Perform analysis
+            var result = await analyzer.AnalyzeStructureAsync(systemPath, detectPatterns, calculateMetrics);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in AnalyzeCodeStructure: {ex.Message}");
+            return $"Error analyzing code structure: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Generate factual information about code for documentation and analysis.")]
+    public static async Task<string> GenerateCodeFacts(
+        [Description("Path to the C# file or project")] string path,
+        [Description("Output format: 'json', 'markdown', 'text'")] string format = "json",
+        [Description("Include natural language descriptions")] bool includeDescriptions = true)
+    {
+        try
+        {
+            Console.Error.WriteLine($"GenerateCodeFacts called with path: '{path}', format: '{format}'");
+
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create code facts generator service
+            var generator = new CodeFactsGenerator();
+            
+            // Generate facts
+            var result = await generator.GenerateCodeFactsAsync(systemPath, format, includeDescriptions);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in GenerateCodeFacts: {ex.Message}");
+            return $"Error generating code facts: {ex.Message}";
+        }
+    }
 }
 
 [McpServerToolType]

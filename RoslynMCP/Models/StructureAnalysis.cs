@@ -54,3 +54,30 @@ public class DependencyNode
     public string Name { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty; // Class, Interface, Namespace, etc.
     public Location Location { get; set; } = new();
+    public int IncomingDependencies { get; set; }
+    public int OutgoingDependencies { get; set; }
+}
+
+public class DependencyEdge
+{
+    public string FromId { get; set; } = string.Empty;
+    public string ToId { get; set; } = string.Empty;
+    public string DependencyType { get; set; } = string.Empty; // Inheritance, Composition, Usage, etc.
+    public int Weight { get; set; } = 1;
+}
+
+public class CircularDependency
+{
+    public List<string> NodeIds { get; set; } = new();
+    public string Description { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+}
+
+public class ArchitecturalInsights
+{
+    public double OverallComplexity { get; set; }
+    public double Maintainability { get; set; }
+    public double Testability { get; set; }
+    public List<string> Recommendations { get; set; } = new();
+    public Dictionary<string, object> QualityMetrics { get; set; } = new();
+}
