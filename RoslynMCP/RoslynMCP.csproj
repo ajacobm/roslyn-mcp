@@ -13,7 +13,16 @@
       <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.13.0" />
       <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.13.0" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.4" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
       <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.13" />
+      
+      <!-- Modern Logging Dependencies -->
+      <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+      <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+      <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+      <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
+      <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+      <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
       
       <!-- Multi-Language Analysis Dependencies -->
       <!-- PackageReference Include="System.Xaml" Version="8.0.0" /-->

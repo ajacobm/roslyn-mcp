@@ -1,6 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.MSBuild;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using RoslynMCP.Models;
 using RoslynMCP.Utils;
 using System.Collections.Concurrent;
@@ -16,15 +18,17 @@ namespace RoslynMCP.Services;
 public class SemanticSolutionAnalyzer
 {
     private readonly MSBuildWorkspace _workspace;
+    private readonly ILogger<SemanticSolutionAnalyzer> _logger;
     private readonly ConcurrentDictionary<ISymbol, string> _symbolToIdMap = new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<string, SemanticSymbolNode> _nodes = new();
     private readonly ConcurrentBag<SemanticRelationship> _relationships = new();
     private readonly ArchitecturalRoleClassifier _roleClassifier = new();
     private readonly FeatureBoundaryDetector _featureDetector = new();
 
-    public SemanticSolutionAnalyzer(MSBuildWorkspace workspace)
+    public SemanticSolutionAnalyzer(MSBuildWorkspace workspace, ILogger<SemanticSolutionAnalyzer>? logger = null)
     {
         _workspace = workspace;
+        _logger = logger ?? NullLogger<SemanticSolutionAnalyzer>.Instance;
     }
 
     /// <summary>
@@ -49,7 +53,7 @@ public class SemanticSolutionAnalyzer
             await AnalyzeRelationshipsAsync(solution, cancellationToken);
 
             // Phase 3: Classify architectural roles
-            await ClassifyArchitecturalRolesAsync(solution, cancellationToken);
+            ClassifyArchitecturalRolesAsync(solution, cancellationToken);
 
             // Phase 4: Detect feature boundaries
             DetectFeatureBoundariesAsync(solution, cancellationToken);
@@ -105,7 +109,7 @@ public class SemanticSolutionAnalyzer
             catch (Exception ex)
             {
                 // Log error but continue with other projects
-                Console.WriteLine($"Error processing project {project.Name}: {ex.Message}");
+                _logger.LogError(ex, "Error processing project {ProjectName}: {Message}", project.Name, ex.Message);
             }
         });
 
@@ -165,7 +169,7 @@ public class SemanticSolutionAnalyzer
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error analyzing relationships for {node.Name}: {ex.Message}");
+                _logger.LogError(ex, "Error analyzing relationships for {NodeName}: {Message}", node.Name, ex.Message);
             }
         }));
 
@@ -418,9 +422,9 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Phase 3: Classify architectural roles for symbols
     /// </summary>
-    private async Task ClassifyArchitecturalRolesAsync(Solution solution, CancellationToken cancellationToken)
+    private void ClassifyArchitecturalRolesAsync(Solution solution, CancellationToken cancellationToken)
     {
-        var tasks = _nodes.Values.Select(async node =>
+        foreach(var node in _nodes.Values)
         {
             try
             {
@@ -432,11 +436,9 @@ public class SemanticSolutionAnalyzer
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error classifying role for {node.Name}: {ex.Message}");
+                _logger.LogError(ex, "Error classifying role for {NodeName}: {Message}", node.Name, ex.Message);
             }
-        });
-
-        await Task.WhenAll(tasks);
+        }
     }
 
     /// <summary>

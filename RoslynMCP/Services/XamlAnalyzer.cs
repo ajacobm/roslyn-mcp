@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Xaml;
 using System.Xml;
 using System.Xml.Linq;
@@ -8,6 +10,8 @@ namespace RoslynMCP.Services;
 
 public class XamlAnalyzer
 {
+    private readonly ILogger<XamlAnalyzer> _logger;
+    
     private static readonly Regex BindingPattern = new Regex(
         @"\{Binding\s+(?:Path=)?([^,}]+)(?:,\s*Mode=([^,}]+))?(?:,\s*Source=([^,}]+))?(?:,\s*Converter=([^,}]+))?\}",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -15,6 +19,11 @@ public class XamlAnalyzer
     private static readonly Regex EventHandlerPattern = new Regex(
         @"(\w+)=""([^""]+)""",
         RegexOptions.Compiled);
+
+    public XamlAnalyzer(ILogger<XamlAnalyzer>? logger = null)
+    {
+        _logger = logger ?? NullLogger<XamlAnalyzer>.Instance;
+    }
 
     public async Task<XamlMetadata> AnalyzeXamlFileAsync(string filePath)
     {
@@ -256,7 +265,7 @@ public class XamlAnalyzer
         catch (Exception ex)
         {
             // Log error but continue processing other files
-            Console.Error.WriteLine($"Error analyzing XAML file {xamlFile}: {ex.Message}");
+            _logger.LogError(ex, "Error analyzing XAML file {XamlFile}: {Message}", xamlFile, ex.Message);
         }
     }
 
@@ -286,7 +295,7 @@ public class XamlAnalyzer
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error analyzing code-behind file {codeBehindFile}: {ex.Message}");
+            _logger.LogError(ex, "Error analyzing code-behind file {CodeBehindFile}: {Message}", codeBehindFile, ex.Message);
         }
     }
 
@@ -328,7 +337,7 @@ public class XamlAnalyzer
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error analyzing ViewModel file {viewModelFile}: {ex.Message}");
+                _logger.LogError(ex, "Error analyzing ViewModel file {ViewModelFile}: {Message}", viewModelFile, ex.Message);
             }
         }
     }
@@ -368,7 +377,7 @@ public class XamlAnalyzer
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error analyzing shared members: {ex.Message}");
+            _logger.LogError(ex, "Error analyzing shared members: {Message}", ex.Message);
         }
     }
 
