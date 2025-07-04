@@ -7,7 +7,7 @@ namespace RoslynMCP.Services;
 
 public class PatternDetector
 {
-    public async Task<List<DesignPattern>> DetectPatternsAsync(SyntaxNode root, string filePath)
+    public List<DesignPattern> DetectPatternsAsync(SyntaxNode root, string filePath)
     {
         var patterns = new List<DesignPattern>();
 

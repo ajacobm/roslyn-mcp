@@ -11,10 +11,10 @@ namespace RoslynMCP.Services
     public class SymbolGraphExtractor
     {
         private readonly MSBuildWorkspace _workspace;
-        private readonly Dictionary<ISymbol, string> _symbolToIdMap = new();
-        private readonly Dictionary<string, SymbolNode> _nodes = new();
-        private readonly List<SymbolEdge> _edges = new();
-        private readonly HashSet<string> _processedFiles = new();
+        private readonly Dictionary<ISymbol, string> _symbolToIdMap = new(SymbolEqualityComparer.Default);
+        private readonly Dictionary<string, SymbolNode> _nodes = [];
+        private readonly List<SymbolEdge> _edges = [];
+        private readonly HashSet<string> _processedFiles = [];
         private int _edgeIdCounter = 0;
 
         public SymbolGraphExtractor(MSBuildWorkspace workspace)
@@ -92,7 +92,7 @@ namespace RoslynMCP.Services
                 throw new FileNotFoundException($"File not found: {filePath}");
 
             // Find containing project
-            var projectPath = await FindContainingProjectAsync(filePath);
+            var projectPath = FindContainingProjectAsync(filePath);
             if (string.IsNullOrEmpty(projectPath))
                 throw new InvalidOperationException("Could not find containing project for file");
 
@@ -116,7 +116,7 @@ namespace RoslynMCP.Services
             }
             else
             {
-                projectPath = await FindContainingProjectAsync(path);
+                projectPath = FindContainingProjectAsync(path);
                 if (string.IsNullOrEmpty(projectPath))
                     throw new InvalidOperationException("Could not find project file");
             }
@@ -792,10 +792,10 @@ namespace RoslynMCP.Services
             return props;
         }
 
-        private async Task<string> FindContainingProjectAsync(string filePath)
+        private string FindContainingProjectAsync(string filePath)
         {
             // Start from the directory containing the file and go up until we find a .csproj file
-            DirectoryInfo directory = new FileInfo(filePath).Directory;
+            DirectoryInfo? directory = new FileInfo(filePath).Directory;
 
             while (directory != null)
             {

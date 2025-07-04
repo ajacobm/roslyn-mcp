@@ -36,7 +36,11 @@ class Program
     public static async Task<string> FindContainingProjectAsync(string filePath)
     {
         // Start from the directory containing the file and go up until we find a .csproj file
-        DirectoryInfo directory = new FileInfo(filePath).Directory;
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            return string.Empty;
+        }
+        DirectoryInfo? directory = new FileInfo(filePath).Directory;
 
         while (directory != null)
         {
@@ -93,7 +97,7 @@ class Program
     }
 
     public static async Task ValidateFileInProjectContextAsync(string filePath, string projectPath,
-        TextWriter writer = null, bool runAnalyzers = true)
+        TextWriter writer, bool runAnalyzers = true)
     {
         // Use the provided TextWriter or fallback to Console.Out
         writer ??= Console.Out;
@@ -145,9 +149,9 @@ class Program
 
             // Parse syntax tree
             var syntaxTree = await document.GetSyntaxTreeAsync();
-            var syntaxDiagnostics = syntaxTree.GetDiagnostics();
+            var syntaxDiagnostics = syntaxTree?.GetDiagnostics();
 
-            if (syntaxDiagnostics.Any())
+            if (syntaxDiagnostics != null && syntaxDiagnostics.Any())
             {
                 writer.WriteLine("Syntax errors found:");
                 foreach (var diagnostic in syntaxDiagnostics)
@@ -163,9 +167,9 @@ class Program
 
             // Get the semantic model for deeper analysis
             var semanticModel = await document.GetSemanticModelAsync();
-            var semanticDiagnostics = semanticModel.GetDiagnostics();
+            var semanticDiagnostics = semanticModel?.GetDiagnostics();
 
-            if (semanticDiagnostics.Any())
+            if (semanticDiagnostics != null && semanticDiagnostics.Value.Any())
             {
                 writer.WriteLine("\nSemantic errors found:");
                 foreach (var diagnostic in semanticDiagnostics)
@@ -182,6 +186,11 @@ class Program
             // Check compilation for the entire project to validate references
             var compilation = await project.GetCompilationAsync();
             
+            if (compilation == null)
+            {
+                writer.WriteLine("Error: Unable to get compilation for the project.");
+                return;
+            }
             // Get compilation diagnostics for the file
             var compilationDiagnostics = compilation.GetDiagnostics()
                 .Where(d => d.Location.SourceTree != null &&
@@ -229,7 +238,12 @@ class Program
                             {
                                 try
                                 {
-                                    var analyzer = (DiagnosticAnalyzer)Activator.CreateInstance(analyzerType);
+                                    var analyzer = Activator.CreateInstance(analyzerType) as DiagnosticAnalyzer;
+                                    if (analyzer == null)
+                                    {
+                                        writer.WriteLine($"Warning: {analyzerType.FullName} is not a valid DiagnosticAnalyzer.");
+                                        continue;
+                                    }
                                     analyzers.Add(analyzer);
                                 }
                                 catch (Exception ex)
@@ -252,22 +266,28 @@ class Program
                         {
                             try
                             {
-                                if (assembly.FullName.Contains("Microsoft.CodeAnalysis") && assembly.FullName.Contains("Analyzers"))
-                                {
-                                    var analyzerTypes = assembly.GetTypes()
-                                        .Where(t => !t.IsAbstract && typeof(DiagnosticAnalyzer).IsAssignableFrom(t));
+                                // Check if the assembly is a Roslyn analyzer assembly
+                                if (assembly.IsDynamic || assembly.Location == null)
+                                    continue;
+
+                                var analyzerTypes = assembly.GetTypes()
+                                    .Where(t => !t.IsAbstract && typeof(DiagnosticAnalyzer).IsAssignableFrom(t));
                                     
-                                    foreach (var analyzerType in analyzerTypes)
+                                foreach (var analyzerType in analyzerTypes)
+                                {
+                                    try
                                     {
-                                        try
+                                        var analyzer = Activator.CreateInstance(analyzerType) as DiagnosticAnalyzer;
+                                        if (analyzer == null)
                                         {
-                                            var analyzer = (DiagnosticAnalyzer)Activator.CreateInstance(analyzerType);
-                                            analyzers.Add(analyzer);
+                                            writer.WriteLine($"Warning: {analyzerType.FullName} is not a valid DiagnosticAnalyzer.");
+                                            continue;
                                         }
-                                        catch (Exception ex)
-                                        {
-                                            Console.Error.WriteLine($"Error creating analyzer instance: {ex.Message}");
-                                        }
+                                        analyzers.Add(analyzer);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.Error.WriteLine($"Error creating analyzer instance: {ex.Message}");
                                     }
                                 }
                             }
@@ -358,8 +378,13 @@ class Program
             if (languageServicesField != null)
             {
                 var languageServices = languageServicesField.GetValue(workspace);
-                var languageServicesType = languageServices.GetType();
+                var languageServicesType = languageServices?.GetType();
 
+                if (languageServicesType == null)
+                {
+                    Console.WriteLine("Warning: Unable to retrieve language services type.");
+                    return;
+                }
                 // Try to find the method to register a language service
                 var registerLanguageServiceMethod = languageServicesType
                     .GetMethods(BindingFlags.Public | BindingFlags.Instance)
@@ -390,125 +415,6 @@ class Program
         {
             Console.WriteLine($"Warning: Error while registering language services: {ex.Message}");
             // Continue execution as the standard registration might still work
-        }
-    }
-
-    /// <summary>
-    /// Adds Microsoft recommended analyzers to the compilation
-    /// </summary>
-    private static Compilation AddAnalyzersToCompilation(Compilation compilation)
-    {
-        try
-        {
-            // Get the analyzer assembly paths
-            var analyzerAssemblies = new List<string>();
-            
-            // Try to find the analyzer assemblies in the NuGet packages
-            var nugetPackagesPath = Environment.GetEnvironmentVariable("NUGET_PACKAGES") 
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
-            
-            // Microsoft.CodeAnalysis.NetAnalyzers
-            var netAnalyzersPath = Path.Combine(nugetPackagesPath, "microsoft.codeanalysis.analyzers", "3.11.0", 
-                "analyzers", "dotnet", "cs", "Microsoft.CodeAnalysis.Analyzers.dll");
-            if (File.Exists(netAnalyzersPath))
-                analyzerAssemblies.Add(netAnalyzersPath);
-            
-            var csharpAnalyzersPath = Path.Combine(nugetPackagesPath, "microsoft.codeanalysis.analyzers", "3.11.0", 
-                "analyzers", "dotnet", "cs", "Microsoft.CodeAnalysis.CSharp.Analyzers.dll");
-            if (File.Exists(csharpAnalyzersPath))
-                analyzerAssemblies.Add(csharpAnalyzersPath);
-            
-            // Load the analyzers
-            var analyzers = new List<DiagnosticAnalyzer>();
-            foreach (var analyzerPath in analyzerAssemblies)
-            {
-                try
-                {
-                    var analyzerAssembly = Assembly.LoadFrom(analyzerPath);
-                    var analyzerTypes = analyzerAssembly.GetTypes()
-                        .Where(t => !t.IsAbstract && typeof(DiagnosticAnalyzer).IsAssignableFrom(t));
-                    
-                    foreach (var analyzerType in analyzerTypes)
-                    {
-                        try
-                        {
-                            var analyzer = (DiagnosticAnalyzer)Activator.CreateInstance(analyzerType);
-                            analyzers.Add(analyzer);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.Error.WriteLine($"Error creating analyzer instance: {ex.Message}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error loading analyzer assembly: {ex.Message}");
-                }
-            }
-            
-            // If no analyzers were found in the NuGet packages, try to use the ones that are already loaded
-            if (!analyzers.Any())
-            {
-                var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-                foreach (var assembly in loadedAssemblies)
-                {
-                    try
-                    {
-                        if (assembly.FullName.Contains("Microsoft.CodeAnalysis") && assembly.FullName.Contains("Analyzers"))
-                        {
-                            var analyzerTypes = assembly.GetTypes()
-                                .Where(t => !t.IsAbstract && typeof(DiagnosticAnalyzer).IsAssignableFrom(t));
-                            
-                            foreach (var analyzerType in analyzerTypes)
-                            {
-                                try
-                                {
-                                    var analyzer = (DiagnosticAnalyzer)Activator.CreateInstance(analyzerType);
-                                    analyzers.Add(analyzer);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.Error.WriteLine($"Error creating analyzer instance: {ex.Message}");
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // Ignore errors when trying to get types from dynamic assemblies
-                    }
-                }
-            }
-            
-            // Add the analyzers to the compilation
-            if (analyzers.Any())
-            {
-                Console.Error.WriteLine($"Added {analyzers.Count} analyzers to compilation");
-                
-                // Create a CompilationWithAnalyzers object
-                var compilationWithAnalyzers = compilation.WithAnalyzers(
-                    ImmutableArray.CreateRange(analyzers));
-                
-                // Get the diagnostics from the analyzers
-                var analyzerDiagnostics = compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync().Result;
-                
-                // Add the analyzer diagnostics to the compilation diagnostics
-                var allDiagnostics = compilation.GetDiagnostics()
-                    .Concat(analyzerDiagnostics)
-                    .ToImmutableArray();
-                
-                // Return the original compilation (we've already extracted the diagnostics)
-                return compilation;
-            }
-            
-            Console.Error.WriteLine("No analyzers found");
-            return compilation;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error adding analyzers: {ex.Message}");
-            return compilation;
         }
     }
 }
@@ -718,6 +624,10 @@ public static class RoslynTools
             var position = sourceText.Lines[line - 1].Start + (column - 1);
 
             var semanticModel = await document.GetSemanticModelAsync();
+            if (semanticModel == null)
+            {
+                return "Error: Unable to get semantic model for the document.";
+            }
             var symbol = await SymbolFinder.FindSymbolAtPositionAsync(semanticModel, position, workspace);
 
             if (symbol == null) return "No symbol found at specified position.";

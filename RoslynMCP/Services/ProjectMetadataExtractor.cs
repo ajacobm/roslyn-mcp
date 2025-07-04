@@ -213,7 +213,7 @@ public class ProjectMetadataExtractor
         {
             try
             {
-                var typeInfo = await CreateTypeInfoAsync(typeSymbol, compilation);
+                var typeInfo = CreateTypeInfoAsync(typeSymbol, compilation);
                 types.Add(typeInfo);
             }
             catch (Exception ex)
@@ -229,7 +229,7 @@ public class ProjectMetadataExtractor
         }
     }
 
-    private async Task<Models.TypeInfo> CreateTypeInfoAsync(INamedTypeSymbol typeSymbol, Compilation compilation)
+    private Models.TypeInfo CreateTypeInfoAsync(INamedTypeSymbol typeSymbol, Compilation compilation)
     {
         var typeInfo = new Models.TypeInfo
         {
@@ -251,7 +251,7 @@ public class ProjectMetadataExtractor
         };
 
         // Extract documentation and source location
-        typeInfo.Documentation = await ExtractDocumentationAsync(typeSymbol);
+        typeInfo.Documentation = ExtractDocumentationAsync(typeSymbol);
         typeInfo.SourceLocation = ExtractSourceLocation(typeSymbol);
 
         return typeInfo;
@@ -280,7 +280,7 @@ public class ProjectMetadataExtractor
         {
             try
             {
-                await ExtractMembersFromTypeAsync(typeSymbol, members, compilation);
+                ExtractMembersFromTypeAsync(typeSymbol, members, compilation);
             }
             catch (Exception ex)
             {
@@ -295,13 +295,13 @@ public class ProjectMetadataExtractor
         }
     }
 
-    private async Task ExtractMembersFromTypeAsync(INamedTypeSymbol typeSymbol, List<MemberInfo> members, Compilation compilation)
+    private void ExtractMembersFromTypeAsync(INamedTypeSymbol typeSymbol, List<MemberInfo> members, Compilation compilation)
     {
         foreach (var memberSymbol in typeSymbol.GetMembers())
         {
             try
             {
-                var memberInfo = await CreateMemberInfoAsync(memberSymbol, compilation);
+                var memberInfo = CreateMemberInfoAsync(memberSymbol, compilation);
                 if (memberInfo != null)
                 {
                     members.Add(memberInfo);
@@ -314,7 +314,7 @@ public class ProjectMetadataExtractor
         }
     }
 
-    private async Task<MemberInfo?> CreateMemberInfoAsync(ISymbol memberSymbol, Compilation compilation)
+    private MemberInfo? CreateMemberInfoAsync(ISymbol memberSymbol, Compilation compilation)
     {
         var memberInfo = new MemberInfo
         {
@@ -351,7 +351,7 @@ public class ProjectMetadataExtractor
         }
 
         // Extract documentation and source location
-        memberInfo.Documentation = await ExtractDocumentationAsync(memberSymbol);
+        memberInfo.Documentation = ExtractDocumentationAsync(memberSymbol);
         memberInfo.SourceLocation = ExtractSourceLocation(memberSymbol);
 
         return memberInfo;
@@ -472,7 +472,7 @@ public class ProjectMetadataExtractor
         return arguments;
     }
 
-    private async Task<DocumentationInfo?> ExtractDocumentationAsync(ISymbol symbol)
+    private DocumentationInfo? ExtractDocumentationAsync(ISymbol symbol)
     {
         try
         {

@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Test configuration
-IMAGE_NAME="roslyn-mcp:test"
+IMAGE_NAME="ajacobm/roslyn-mcp:test"
 CONTAINER_NAME="roslyn-mcp-test"
 TEST_WORKSPACE="test-workspace"
 

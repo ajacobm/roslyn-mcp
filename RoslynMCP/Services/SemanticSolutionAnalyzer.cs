@@ -52,13 +52,13 @@ public class SemanticSolutionAnalyzer
             await ClassifyArchitecturalRolesAsync(solution, cancellationToken);
 
             // Phase 4: Detect feature boundaries
-            await DetectFeatureBoundariesAsync(solution, cancellationToken);
+            DetectFeatureBoundariesAsync(solution, cancellationToken);
 
             // Phase 5: Build cross-project dependencies
-            var crossProjectDeps = await AnalyzeCrossProjectDependenciesAsync(solution, cancellationToken);
+            var crossProjectDeps = AnalyzeCrossProjectDependenciesAsync(solution, cancellationToken);
 
             // Phase 6: Build project information
-            var projectInfo = await BuildProjectInformationAsync(solution, cancellationToken);
+            var projectInfo = BuildProjectInformationAsync(solution, cancellationToken);
 
             stopwatch.Stop();
             metadata.AnalysisDuration = stopwatch.Elapsed;
@@ -123,7 +123,7 @@ public class SemanticSolutionAnalyzer
             await semaphore.WaitAsync(cancellationToken);
             try
             {
-                await ProcessSymbolAsync(symbol, project, compilation, cancellationToken);
+                ProcessSymbolAsync(symbol, project, compilation, cancellationToken);
             }
             finally
             {
@@ -137,14 +137,14 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Process individual symbol and create semantic node
     /// </summary>
-    private async Task ProcessSymbolAsync(ISymbol symbol, Project project, Compilation compilation, CancellationToken cancellationToken)
+    private void ProcessSymbolAsync(ISymbol symbol, Project project, Compilation compilation, CancellationToken cancellationToken)
     {
         if (ShouldSkipSymbol(symbol)) return;
 
         var symbolId = GenerateSymbolId(symbol);
         _symbolToIdMap.TryAdd(symbol, symbolId);
 
-        var node = await CreateSemanticSymbolNodeAsync(symbol, project, compilation, cancellationToken);
+        var node = CreateSemanticSymbolNodeAsync(symbol, project, compilation, cancellationToken);
         _nodes.TryAdd(symbolId, node);
     }
 
@@ -153,11 +153,11 @@ public class SemanticSolutionAnalyzer
     /// </summary>
     private async Task AnalyzeRelationshipsAsync(Solution solution, CancellationToken cancellationToken)
     {
-        var tasks = _nodes.Values.Select(async node =>
+        var tasks = _nodes.Values.Select(node => Task.Run(async () =>
         {
             try
             {
-                var symbol = await FindSymbolByIdAsync(node.Id, solution, cancellationToken);
+                var symbol = FindSymbolByIdAsync(node.Id, solution, cancellationToken);
                 if (symbol != null)
                 {
                     await AnalyzeSymbolRelationshipsAsync(symbol, solution, cancellationToken);
@@ -167,7 +167,7 @@ public class SemanticSolutionAnalyzer
             {
                 Console.WriteLine($"Error analyzing relationships for {node.Name}: {ex.Message}");
             }
-        });
+        }));
 
         await Task.WhenAll(tasks);
     }
@@ -193,18 +193,18 @@ public class SemanticSolutionAnalyzer
             {
                 implementations = ImmutableArray<ISymbol>.Empty;
             }
-            await ProcessImplementationsAsync(symbol, implementations, cancellationToken);
+            ProcessImplementationsAsync(symbol, implementations, cancellationToken);
         }
 
         // Find derived types if it's a class
         if (symbol is INamedTypeSymbol namedType && namedType.TypeKind == TypeKind.Class)
         {
             var derivedTypes = await SymbolFinder.FindDerivedClassesAsync(namedType, solution, ImmutableHashSet<Project>.Empty, cancellationToken);
-            await ProcessDerivedTypesAsync(symbol, derivedTypes, cancellationToken);
+            ProcessDerivedTypesAsync(symbol, derivedTypes, cancellationToken);
         }
 
         // Analyze type-specific relationships
-        await AnalyzeTypeSpecificRelationshipsAsync(symbol, solution, cancellationToken);
+        AnalyzeTypeSpecificRelationshipsAsync(symbol, solution, cancellationToken);
     }
 
     /// <summary>
@@ -240,7 +240,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Process implementations and create inheritance relationships
     /// </summary>
-    private async Task ProcessImplementationsAsync(ISymbol symbol, IEnumerable<ISymbol> implementations, CancellationToken cancellationToken)
+    private void ProcessImplementationsAsync(ISymbol symbol, IEnumerable<ISymbol> implementations, CancellationToken cancellationToken)
     {
         var sourceId = _symbolToIdMap.GetValueOrDefault(symbol);
         if (string.IsNullOrEmpty(sourceId)) return;
@@ -264,7 +264,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Process derived types and create inheritance relationships
     /// </summary>
-    private async Task ProcessDerivedTypesAsync(ISymbol symbol, IEnumerable<INamedTypeSymbol> derivedTypes, CancellationToken cancellationToken)
+    private void ProcessDerivedTypesAsync(ISymbol symbol, IEnumerable<INamedTypeSymbol> derivedTypes, CancellationToken cancellationToken)
     {
         var sourceId = _symbolToIdMap.GetValueOrDefault(symbol);
         if (string.IsNullOrEmpty(sourceId)) return;
@@ -283,21 +283,21 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Analyze type-specific relationships (composition, aggregation, etc.)
     /// </summary>
-    private async Task AnalyzeTypeSpecificRelationshipsAsync(ISymbol symbol, Solution solution, CancellationToken cancellationToken)
+    private void AnalyzeTypeSpecificRelationshipsAsync(ISymbol symbol, Solution solution, CancellationToken cancellationToken)
     {
         switch (symbol.Kind)
         {
             case Microsoft.CodeAnalysis.SymbolKind.NamedType:
-                await AnalyzeNamedTypeRelationshipsAsync((INamedTypeSymbol)symbol, solution, cancellationToken);
+                AnalyzeNamedTypeRelationshipsAsync((INamedTypeSymbol)symbol, solution, cancellationToken);
                 break;
             case Microsoft.CodeAnalysis.SymbolKind.Method:
-                await AnalyzeMethodRelationshipsAsync((IMethodSymbol)symbol, solution, cancellationToken);
+                AnalyzeMethodRelationshipsAsync((IMethodSymbol)symbol, solution, cancellationToken);
                 break;
             case Microsoft.CodeAnalysis.SymbolKind.Property:
-                await AnalyzePropertyRelationshipsAsync((IPropertySymbol)symbol, solution, cancellationToken);
+                AnalyzePropertyRelationshipsAsync((IPropertySymbol)symbol, solution, cancellationToken);
                 break;
             case Microsoft.CodeAnalysis.SymbolKind.Field:
-                await AnalyzeFieldRelationshipsAsync((IFieldSymbol)symbol, solution, cancellationToken);
+                AnalyzeFieldRelationshipsAsync((IFieldSymbol)symbol, solution, cancellationToken);
                 break;
         }
     }
@@ -305,7 +305,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Analyze relationships for named types (classes, interfaces, etc.)
     /// </summary>
-    private async Task AnalyzeNamedTypeRelationshipsAsync(INamedTypeSymbol namedType, Solution solution, CancellationToken cancellationToken)
+    private void AnalyzeNamedTypeRelationshipsAsync(INamedTypeSymbol namedType, Solution solution, CancellationToken cancellationToken)
     {
         var sourceId = _symbolToIdMap.GetValueOrDefault(namedType);
         if (string.IsNullOrEmpty(sourceId)) return;
@@ -338,11 +338,11 @@ public class SemanticSolutionAnalyzer
         {
             if (member is IFieldSymbol field && !field.IsStatic)
             {
-                await AnalyzeCompositionRelationshipAsync(sourceId, field.Type, SemanticRelationshipType.Composition, cancellationToken);
+                AnalyzeCompositionRelationshipAsync(sourceId, field.Type, SemanticRelationshipType.Composition, cancellationToken);
             }
             else if (member is IPropertySymbol property && !property.IsStatic)
             {
-                await AnalyzeCompositionRelationshipAsync(sourceId, property.Type, SemanticRelationshipType.Composition, cancellationToken);
+                AnalyzeCompositionRelationshipAsync(sourceId, property.Type, SemanticRelationshipType.Composition, cancellationToken);
             }
         }
     }
@@ -350,7 +350,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Analyze method relationships (calls, overrides, etc.)
     /// </summary>
-    private async Task AnalyzeMethodRelationshipsAsync(IMethodSymbol method, Solution solution, CancellationToken cancellationToken)
+    private void AnalyzeMethodRelationshipsAsync(IMethodSymbol method, Solution solution, CancellationToken cancellationToken)
     {
         var sourceId = _symbolToIdMap.GetValueOrDefault(method);
         if (string.IsNullOrEmpty(sourceId)) return;
@@ -369,43 +369,43 @@ public class SemanticSolutionAnalyzer
         // Analyze parameter type relationships
         foreach (var parameter in method.Parameters)
         {
-            await AnalyzeCompositionRelationshipAsync(sourceId, parameter.Type, SemanticRelationshipType.Association, cancellationToken);
+            AnalyzeCompositionRelationshipAsync(sourceId, parameter.Type, SemanticRelationshipType.Association, cancellationToken);
         }
 
         // Analyze return type relationship
         if (!method.ReturnsVoid)
         {
-            await AnalyzeCompositionRelationshipAsync(sourceId, method.ReturnType, SemanticRelationshipType.Association, cancellationToken);
+            AnalyzeCompositionRelationshipAsync(sourceId, method.ReturnType, SemanticRelationshipType.Association, cancellationToken);
         }
     }
 
     /// <summary>
     /// Analyze property relationships
     /// </summary>
-    private async Task AnalyzePropertyRelationshipsAsync(IPropertySymbol property, Solution solution, CancellationToken cancellationToken)
+    private void AnalyzePropertyRelationshipsAsync(IPropertySymbol property, Solution solution, CancellationToken cancellationToken)
     {
         var sourceId = _symbolToIdMap.GetValueOrDefault(property);
         if (string.IsNullOrEmpty(sourceId)) return;
 
-        await AnalyzeCompositionRelationshipAsync(sourceId, property.Type, SemanticRelationshipType.Association, cancellationToken);
+        AnalyzeCompositionRelationshipAsync(sourceId, property.Type, SemanticRelationshipType.Association, cancellationToken);
     }
 
     /// <summary>
     /// Analyze field relationships
     /// </summary>
-    private async Task AnalyzeFieldRelationshipsAsync(IFieldSymbol field, Solution solution, CancellationToken cancellationToken)
+    private void AnalyzeFieldRelationshipsAsync(IFieldSymbol field, Solution solution, CancellationToken cancellationToken)
     {
         var sourceId = _symbolToIdMap.GetValueOrDefault(field);
         if (string.IsNullOrEmpty(sourceId)) return;
 
         var relationshipType = field.IsReadOnly ? SemanticRelationshipType.Composition : SemanticRelationshipType.Aggregation;
-        await AnalyzeCompositionRelationshipAsync(sourceId, field.Type, relationshipType, cancellationToken);
+        AnalyzeCompositionRelationshipAsync(sourceId, field.Type, relationshipType, cancellationToken);
     }
 
     /// <summary>
     /// Analyze composition/aggregation relationships
     /// </summary>
-    private async Task AnalyzeCompositionRelationshipAsync(string sourceId, ITypeSymbol targetType, SemanticRelationshipType relationshipType, CancellationToken cancellationToken)
+    private void AnalyzeCompositionRelationshipAsync(string sourceId, ITypeSymbol targetType, SemanticRelationshipType relationshipType, CancellationToken cancellationToken)
     {
         var targetId = _symbolToIdMap.GetValueOrDefault(targetType);
         if (!string.IsNullOrEmpty(targetId) && targetId != sourceId)
@@ -424,10 +424,10 @@ public class SemanticSolutionAnalyzer
         {
             try
             {
-                var symbol = await FindSymbolByIdAsync(node.Id, solution, cancellationToken);
+                var symbol = FindSymbolByIdAsync(node.Id, solution, cancellationToken);
                 if (symbol != null)
                 {
-                    node.Role = await _roleClassifier.ClassifySymbolRoleAsync(symbol, solution, cancellationToken);
+                    node.Role = _roleClassifier.ClassifySymbolRoleAsync(symbol, solution, cancellationToken);
                 }
             }
             catch (Exception ex)
@@ -442,9 +442,9 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Phase 4: Detect feature boundaries
     /// </summary>
-    private async Task DetectFeatureBoundariesAsync(Solution solution, CancellationToken cancellationToken)
+    private void DetectFeatureBoundariesAsync(Solution solution, CancellationToken cancellationToken)
     {
-        var featureBoundaries = await _featureDetector.DetectFeatureBoundariesAsync(_nodes.Values, _relationships, cancellationToken);
+        var featureBoundaries = _featureDetector.DetectFeatureBoundariesAsync(_nodes.Values, _relationships, cancellationToken);
         
         foreach (var (featureName, symbolIds) in featureBoundaries)
         {
@@ -461,7 +461,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Phase 5: Analyze cross-project dependencies
     /// </summary>
-    private async Task<List<CrossProjectDependency>> AnalyzeCrossProjectDependenciesAsync(Solution solution, CancellationToken cancellationToken)
+    private List<CrossProjectDependency> AnalyzeCrossProjectDependenciesAsync(Solution solution, CancellationToken cancellationToken)
     {
         var dependencies = new List<CrossProjectDependency>();
         var projectPairs = solution.Projects
@@ -502,7 +502,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Phase 6: Build project information
     /// </summary>
-    private async Task<Dictionary<string, ProjectSemanticInfo>> BuildProjectInformationAsync(Solution solution, CancellationToken cancellationToken)
+    private Dictionary<string, ProjectSemanticInfo> BuildProjectInformationAsync(Solution solution, CancellationToken cancellationToken)
     {
         var projectInfo = new Dictionary<string, ProjectSemanticInfo>();
 
@@ -513,6 +513,7 @@ public class SemanticSolutionAnalyzer
                 projectNodes.Any(n => n.Id == r.SourceSymbolId) || 
                 projectNodes.Any(n => n.Id == r.TargetSymbolId)).ToList();
 
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
             var info = new ProjectSemanticInfo
             {
                 ProjectId = project.Id.ToString(),
@@ -531,10 +532,11 @@ public class SemanticSolutionAnalyzer
                     AverageComplexity = projectNodes.Any() ? projectNodes.Average(n => n.Metrics.CyclomaticComplexity) : 0.0,
                     LanguageDistribution = projectNodes
                         .Where(n => n.Location?.File != null)
-                        .GroupBy(n => GetLanguageFromPath(n.Location.File))
+                        .GroupBy(n => GetLanguageFromPath(n.Location.File)) // CS8602 warning suppressed
                         .ToDictionary(g => g.Key, g => g.Count())
                 }
             };
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
 
             projectInfo[project.Id.ToString()] = info;
         }
@@ -547,7 +549,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Create a semantic symbol node from a Roslyn symbol
     /// </summary>
-    private async Task<SemanticSymbolNode> CreateSemanticSymbolNodeAsync(ISymbol symbol, Project project, Compilation compilation, CancellationToken cancellationToken)
+    private SemanticSymbolNode CreateSemanticSymbolNodeAsync(ISymbol symbol, Project project, Compilation compilation, CancellationToken cancellationToken)
     {
         var location = symbol.Locations.FirstOrDefault();
 
@@ -566,7 +568,7 @@ public class SemanticSolutionAnalyzer
             Interfaces = GetInterfaces(symbol),
             BaseType = GetBaseType(symbol),
             GenericTypeParameters = GetGenericTypeParameters(symbol),
-            Metrics = await CalculateSemanticMetricsAsync(symbol, compilation, cancellationToken)
+            Metrics = CalculateSemanticMetricsAsync(symbol, compilation, cancellationToken)
         };
 
         return node;
@@ -613,7 +615,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Calculate semantic metrics for a symbol
     /// </summary>
-    private async Task<SemanticMetrics> CalculateSemanticMetricsAsync(ISymbol symbol, Compilation compilation, CancellationToken cancellationToken)
+    private SemanticMetrics CalculateSemanticMetricsAsync(ISymbol symbol, Compilation compilation, CancellationToken cancellationToken)
     {
         var metrics = new SemanticMetrics();
 
@@ -819,7 +821,7 @@ public class SemanticSolutionAnalyzer
     /// <summary>
     /// Find symbol by ID in the solution
     /// </summary>
-    private async Task<ISymbol?> FindSymbolByIdAsync(string symbolId, Solution solution, CancellationToken cancellationToken)
+    private ISymbol? FindSymbolByIdAsync(string symbolId, Solution solution, CancellationToken cancellationToken)
     {
         return _symbolToIdMap.FirstOrDefault(kvp => string.Equals(kvp.Value, symbolId, StringComparison.Ordinal)).Key;
     }
@@ -852,7 +854,7 @@ public class SemanticSolutionAnalyzer
 /// </summary>
 public class ArchitecturalRoleClassifier
 {
-    public async Task<ArchitecturalRole> ClassifySymbolRoleAsync(ISymbol symbol, Solution solution, CancellationToken cancellationToken)
+    public ArchitecturalRole ClassifySymbolRoleAsync(ISymbol symbol, Solution solution, CancellationToken cancellationToken)
     {
         if (symbol is not INamedTypeSymbol namedType)
             return ArchitecturalRole.Unknown;
@@ -995,7 +997,7 @@ public class ArchitecturalRoleClassifier
 /// </summary>
 public class FeatureBoundaryDetector
 {
-    public async Task<Dictionary<string, List<string>>> DetectFeatureBoundariesAsync(
+    public Dictionary<string, List<string>> DetectFeatureBoundariesAsync(
         IEnumerable<SemanticSymbolNode> nodes, 
         IEnumerable<SemanticRelationship> relationships, 
         CancellationToken cancellationToken)
@@ -1016,7 +1018,7 @@ public class FeatureBoundaryDetector
         }
 
         // Refine boundaries using clustering based on relationships
-        await RefineFeatureBoundariesAsync(featureBoundaries, relationshipList, cancellationToken);
+        RefineFeatureBoundariesAsync(featureBoundaries, relationshipList, cancellationToken);
 
         return featureBoundaries;
     }
@@ -1039,7 +1041,7 @@ public class FeatureBoundaryDetector
         return parts[0];
     }
 
-    private async Task RefineFeatureBoundariesAsync(
+    private void RefineFeatureBoundariesAsync(
         Dictionary<string, List<string>> boundaries, 
         List<SemanticRelationship> relationships, 
         CancellationToken cancellationToken)

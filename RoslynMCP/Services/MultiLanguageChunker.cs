@@ -42,7 +42,7 @@ public class MultiLanguageChunker
         {
             // Determine if this is a file or project
             bool isProject = path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase);
-            string projectPath = isProject ? path : await FindContainingProjectAsync(path);
+            string projectPath = isProject ? path : FindContainingProjectAsync(path);
 
             if (string.IsNullOrEmpty(projectPath))
             {
@@ -709,7 +709,7 @@ public class MultiLanguageChunker
         result.MultiLanguageMetadata.CrossLanguageRelationships = result.CrossLanguageRelationships.Values.Sum(v => v.Count);
     }
 
-    private async Task<string> FindContainingProjectAsync(string filePath)
+    private string FindContainingProjectAsync(string filePath)
     {
         var directory = new DirectoryInfo(Path.GetDirectoryName(filePath) ?? ".");
         

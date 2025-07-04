@@ -32,7 +32,7 @@ public class StructureAnalyzer
 
             if (detectPatterns)
             {
-                analysis.DetectedPatterns = await _patternDetector.DetectPatternsAsync(root, filePath);
+                analysis.DetectedPatterns = _patternDetector.DetectPatternsAsync(root, filePath);
             }
 
             if (calculateMetrics)
