@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  roslyn-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: roslyn-mcp:latest
+    container_name: roslyn-mcp-server
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - DOTNET_CLI_TELEMETRY_OPTOUT=1
+      - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+      - DOTNET_NOLOGO=1
+    
+    # For MCP servers, typically you'd use stdin/stdout
+    # This setup allows for interactive testing
+    stdin_open: true
+    tty: true
+    
+    # Volume mounts for analyzing external code
+    volumes:
+      # Mount a directory for analyzing external C# projects
+      - ./workspace:/workspace:ro
+      # Persist NuGet packages cache
+      - nuget-cache:/home/mcpuser/.nuget/packages
+    
+    # Working directory inside container
+    working_dir: /app
+    
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "dotnet.*RoslynMCP"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Development service with source code mounted
+  roslyn-mcp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    image: roslyn-mcp:dev
+    container_name: roslyn-mcp-dev
+    profiles:
+      - dev
+    
+    environment:
+      - DOTNET_CLI_TELEMETRY_OPTOUT=1
+      - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+      - DOTNET_NOLOGO=1
+      - ASPNETCORE_ENVIRONMENT=Development
+    
+    volumes:
+      # Mount source code for development
+      - .:/src
+      - nuget-cache:/home/mcpuser/.nuget/packages
+    
+    working_dir: /src
+    stdin_open: true
+    tty: true
+    
+    # Override entrypoint for development
+    command: ["dotnet", "run", "--project", "RoslynMCP/RoslynMCP.csproj"]
+
+volumes:
+  nuget-cache:
+    driver: local

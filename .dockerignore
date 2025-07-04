@@ -1,0 +1,52 @@
+# .dockerignore for Roslyn MCP Server
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+
+# IDE and editor files
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+
+# NuGet packages
+*.nupkg
+**/packages/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Docker files (to avoid recursive copying)
+Dockerfile*
+docker-compose*

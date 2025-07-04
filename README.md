@@ -38,6 +38,8 @@ When done implementing changes, run these validation steps as human will not acc
 ```
 
 ## Getting Started
+
+### Option 1: Run with .NET (Local Development)
 1. Build the project
 2. Run the application with:
    ```
@@ -45,10 +47,32 @@ When done implementing changes, run these validation steps as human will not acc
    ```
 3. The server will start and listen for MCP commands via standard I/O
 
+### Option 2: Run with Docker (Recommended for Production)
+1. Build the Docker image:
+   ```bash
+   ./scripts/build.sh
+   ```
+2. Run the container:
+   ```bash
+   ./scripts/run.sh -w /path/to/your/csharp/projects
+   ```
+3. Or use docker-compose:
+   ```bash
+   docker-compose up --build
+   ```
+
+For detailed Docker setup instructions, see [DOCKER.md](DOCKER.md).
+
 ## Requirements
-- .NET SDK
+
+### Local Development
+- .NET 9 SDK
 - MSBuild tools
 - NuGet packages for Roslyn analyzers (automatically loaded if available)
+
+### Docker
+- Docker Engine
+- docker-compose (optional, for easier management)
 
 ## Example Usage
 Validate a C# file:
