@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json.Serialization;
+using Microsoft.CodeAnalysis;
 
 namespace RoslynMCP.Models
 {
@@ -131,28 +132,4 @@ namespace RoslynMCP.Models
         public Dictionary<string, object> Properties { get; set; } = new();
     }
 
-    public enum SymbolKind
-    {
-        Alias,
-        ArrayType,
-        Assembly,
-        DynamicType,
-        ErrorType,
-        Event,
-        Field,
-        Label,
-        Local,
-        Method,
-        NetModule,
-        NamedType,
-        Namespace,
-        Parameter,
-        PointerType,
-        Property,
-        RangeVariable,
-        TypeParameter,
-        Preprocessing,
-        Discard,
-        FunctionPointerType
-    }
 }

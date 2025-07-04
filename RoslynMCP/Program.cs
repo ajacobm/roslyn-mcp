@@ -1191,6 +1191,114 @@ public static class RoslynTools
         }
     }
 
+    [McpServerTool, Description("Extract a unified semantic graph of an entire solution using Roslyn's SymbolFinder APIs for accurate cross-project symbol resolution.")]
+    public static async Task<string> ExtractUnifiedSemanticGraph(
+        [Description("Path to the solution file (.sln) or project file (.csproj)")] string path,
+        [Description("Include architectural role classification")] bool includeRoles = true,
+        [Description("Include feature boundary detection")] bool includeFeatures = true,
+        [Description("Include cross-project dependencies")] bool includeCrossProject = true,
+        [Description("Include cross-language relationships")] bool includeCrossLanguage = false)
+    {
+        try
+        {
+            Console.Error.WriteLine($"ExtractUnifiedSemanticGraph called with path: '{path}'");
+
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            // Determine if this is a solution or project file
+            bool isSolutionFile = systemPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase);
+            bool isProjectFile = systemPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase);
+
+            if (!isSolutionFile && !isProjectFile)
+            {
+                // Try to find solution or project file
+                var directory = new DirectoryInfo(Path.GetDirectoryName(systemPath) ?? ".");
+                string? foundPath = null;
+                
+                // First try to find solution file
+                while (directory != null)
+                {
+                    var solutionFiles = directory.GetFiles("*.sln");
+                    if (solutionFiles.Length > 0)
+                    {
+                        foundPath = solutionFiles[0].FullName;
+                        isSolutionFile = true;
+                        break;
+                    }
+                    directory = directory.Parent;
+                }
+                
+                // If no solution found, try to find project file
+                if (foundPath == null)
+                {
+                    var projectPath = await Program.FindContainingProjectAsync(systemPath);
+                    if (!string.IsNullOrEmpty(projectPath))
+                    {
+                        foundPath = projectPath;
+                        isProjectFile = true;
+                    }
+                }
+                
+                if (foundPath == null)
+                {
+                    return "Error: Could not find a solution (.sln) or project (.csproj) file. Please provide a valid solution or project file path.";
+                }
+                
+                systemPath = foundPath;
+            }
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create workspace and semantic analyzer
+            var workspace = CreateWorkspace();
+            var analyzer = new SemanticSolutionAnalyzer(workspace);
+            
+            Solution solution;
+            if (isSolutionFile)
+            {
+                // Open solution
+                solution = await workspace.OpenSolutionAsync(systemPath);
+            }
+            else
+            {
+                // Open project and get its solution
+                var project = await workspace.OpenProjectAsync(systemPath);
+                solution = project.Solution;
+            }
+
+            // Extract unified semantic graph
+            var result = await analyzer.AnalyzeSolutionAsync(solution);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in ExtractUnifiedSemanticGraph: {ex.Message}");
+            Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                Console.Error.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                Console.Error.WriteLine($"Inner stack trace: {ex.InnerException.StackTrace}");
+            }
+            return $"Error extracting unified semantic graph: {ex.Message}";
+        }
+    }
+
     [McpServerTool, Description("Extract SQL queries and database operations from C# code.")]
     public static async Task<string> ExtractSqlFromCode(
         [Description("Path to the C# file")] string filePath)

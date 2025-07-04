@@ -408,7 +408,7 @@ namespace RoslynMCP.Services
                 Id = GenerateSymbolId(symbol),
                 Name = symbol.Name,
                 FullName = symbol.ToDisplayString(),
-                Kind = ConvertSymbolKind(symbol.Kind),
+                Kind = symbol.Kind,
                 TypeName = GetSymbolTypeName(symbol),
                 Location = location,
                 Accessibility = ConvertAccessibility(symbol.DeclaredAccessibility),
@@ -493,33 +493,10 @@ namespace RoslynMCP.Services
             return 1; // Base complexity
         }
 
-        private Models.SymbolKind ConvertSymbolKind(Microsoft.CodeAnalysis.SymbolKind kind)
+        private SymbolKind ConvertSymbolKind(Microsoft.CodeAnalysis.SymbolKind kind)
         {
-            return kind switch
-            {
-                Microsoft.CodeAnalysis.SymbolKind.Alias => Models.SymbolKind.Alias,
-                Microsoft.CodeAnalysis.SymbolKind.ArrayType => Models.SymbolKind.ArrayType,
-                Microsoft.CodeAnalysis.SymbolKind.Assembly => Models.SymbolKind.Assembly,
-                Microsoft.CodeAnalysis.SymbolKind.DynamicType => Models.SymbolKind.DynamicType,
-                Microsoft.CodeAnalysis.SymbolKind.ErrorType => Models.SymbolKind.ErrorType,
-                Microsoft.CodeAnalysis.SymbolKind.Event => Models.SymbolKind.Event,
-                Microsoft.CodeAnalysis.SymbolKind.Field => Models.SymbolKind.Field,
-                Microsoft.CodeAnalysis.SymbolKind.Label => Models.SymbolKind.Label,
-                Microsoft.CodeAnalysis.SymbolKind.Local => Models.SymbolKind.Local,
-                Microsoft.CodeAnalysis.SymbolKind.Method => Models.SymbolKind.Method,
-                Microsoft.CodeAnalysis.SymbolKind.NetModule => Models.SymbolKind.NetModule,
-                Microsoft.CodeAnalysis.SymbolKind.NamedType => Models.SymbolKind.NamedType,
-                Microsoft.CodeAnalysis.SymbolKind.Namespace => Models.SymbolKind.Namespace,
-                Microsoft.CodeAnalysis.SymbolKind.Parameter => Models.SymbolKind.Parameter,
-                Microsoft.CodeAnalysis.SymbolKind.PointerType => Models.SymbolKind.PointerType,
-                Microsoft.CodeAnalysis.SymbolKind.Property => Models.SymbolKind.Property,
-                Microsoft.CodeAnalysis.SymbolKind.RangeVariable => Models.SymbolKind.RangeVariable,
-                Microsoft.CodeAnalysis.SymbolKind.TypeParameter => Models.SymbolKind.TypeParameter,
-                Microsoft.CodeAnalysis.SymbolKind.Preprocessing => Models.SymbolKind.Preprocessing,
-                Microsoft.CodeAnalysis.SymbolKind.Discard => Models.SymbolKind.Discard,
-                Microsoft.CodeAnalysis.SymbolKind.FunctionPointerType => Models.SymbolKind.FunctionPointerType,
-                _ => Models.SymbolKind.NamedType
-            };
+            // Direct use of Roslyn's SymbolKind - no conversion needed
+            return kind;
         }
 
         private AccessibilityLevel ConvertAccessibility(Accessibility accessibility)
