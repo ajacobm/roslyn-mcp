@@ -758,34 +758,34 @@ public static class RoslynTools
             // Add additional symbol-specific information based on its kind
             switch (symbol.Kind)
             {
-                case SymbolKind.Method:
+                case Microsoft.CodeAnalysis.SymbolKind.Method:
                     var methodSymbol = (IMethodSymbol)symbol;
                     results.AppendLine($"- **Return Type**: {methodSymbol.ReturnType.ToDisplayString()}");
                     results.AppendLine($"- **Is Extension Method**: {methodSymbol.IsExtensionMethod}");
                     results.AppendLine($"- **Parameter Count**: {methodSymbol.Parameters.Length}");
                     break;
-                case SymbolKind.Property:
+                case Microsoft.CodeAnalysis.SymbolKind.Property:
                     var propertySymbol = (IPropertySymbol)symbol;
                     results.AppendLine($"- **Property Type**: {propertySymbol.Type.ToDisplayString()}");
                     results.AppendLine($"- **Has Getter**: {propertySymbol.GetMethod != null}");
                     results.AppendLine($"- **Has Setter**: {propertySymbol.SetMethod != null}");
                     break;
-                case SymbolKind.Field:
+                case Microsoft.CodeAnalysis.SymbolKind.Field:
                     var fieldSymbol = (IFieldSymbol)symbol;
                     results.AppendLine($"- **Field Type**: {fieldSymbol.Type.ToDisplayString()}");
                     results.AppendLine($"- **Is Const**: {fieldSymbol.IsConst}");
                     results.AppendLine($"- **Is Static**: {fieldSymbol.IsStatic}");
                     break;
-                case SymbolKind.Event:
+                case Microsoft.CodeAnalysis.SymbolKind.Event:
                     var eventSymbol = (IEventSymbol)symbol;
                     results.AppendLine($"- **Event Type**: {eventSymbol.Type.ToDisplayString()}");
                     break;
-                case SymbolKind.Parameter:
+                case Microsoft.CodeAnalysis.SymbolKind.Parameter:
                     var parameterSymbol = (IParameterSymbol)symbol;
                     results.AppendLine($"- **Parameter Type**: {parameterSymbol.Type.ToDisplayString()}");
                     results.AppendLine($"- **Is Optional**: {parameterSymbol.IsOptional}");
                     break;
-                case SymbolKind.Local:
+                case Microsoft.CodeAnalysis.SymbolKind.Local:
                     var localSymbol = (ILocalSymbol)symbol;
                     results.AppendLine($"- **Local Type**: {localSymbol.Type.ToDisplayString()}");
                     results.AppendLine($"- **Is Const**: {localSymbol.IsConst}");
@@ -1017,6 +1017,127 @@ public static class RoslynTools
         {
             Console.Error.WriteLine($"ERROR in GenerateCodeFacts: {ex.Message}");
             return $"Error generating code facts: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Extract a comprehensive symbol graph showing relationships between types, methods, and other code elements.")]
+    public static async Task<string> ExtractSymbolGraph(
+        [Description("Path to the C# file or project")] string path,
+        [Description("Graph scope: 'file', 'project', 'solution'")] string scope = "file",
+        [Description("Include inheritance relationships")] bool includeInheritance = true,
+        [Description("Include method call relationships")] bool includeMethodCalls = true,
+        [Description("Include field/property access relationships")] bool includeFieldAccess = true,
+        [Description("Include namespace relationships")] bool includeNamespaces = true,
+        [Description("Maximum depth for relationship traversal")] int maxDepth = 3)
+    {
+        try
+        {
+            Console.Error.WriteLine($"ExtractSymbolGraph called with path: '{path}', scope: '{scope}'");
+
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            // Validate scope parameter
+            var validScopes = new[] { "file", "project", "solution" };
+            if (!validScopes.Contains(scope.ToLowerInvariant()))
+            {
+                return $"Error: Invalid scope '{scope}'. Valid values are: {string.Join(", ", validScopes)}";
+            }
+
+            // For file scope, check if file exists
+            if (scope.ToLowerInvariant() == "file" && !File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // For project scope, check if it's a project file or find containing project
+            if (scope.ToLowerInvariant() == "project")
+            {
+                if (!systemPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Try to find containing project
+                    var projectPath = await Program.FindContainingProjectAsync(systemPath);
+                    if (string.IsNullOrEmpty(projectPath))
+                    {
+                        return "Error: Could not find a project file. Please provide a .csproj file path or a file within a project.";
+                    }
+                    systemPath = projectPath;
+                }
+                else if (!File.Exists(systemPath))
+                {
+                    return $"Error: Project file {systemPath} does not exist.";
+                }
+            }
+
+            // For solution scope, check if it's a solution file or find containing solution
+            if (scope.ToLowerInvariant() == "solution")
+            {
+                if (!systemPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Try to find solution file in directory hierarchy
+                    var directory = new DirectoryInfo(Path.GetDirectoryName(systemPath) ?? ".");
+                    string? solutionPath = null;
+                    
+                    while (directory != null)
+                    {
+                        var solutionFiles = directory.GetFiles("*.sln");
+                        if (solutionFiles.Length > 0)
+                        {
+                            solutionPath = solutionFiles[0].FullName;
+                            break;
+                        }
+                        directory = directory.Parent;
+                    }
+                    
+                    if (solutionPath == null)
+                    {
+                        return "Error: Could not find a solution file. Please provide a .sln file path or ensure you're within a solution directory.";
+                    }
+                    systemPath = solutionPath;
+                }
+                else if (!File.Exists(systemPath))
+                {
+                    return $"Error: Solution file {systemPath} does not exist.";
+                }
+            }
+
+            // Create workspace and symbol graph extractor
+            var workspace = CreateWorkspace();
+            var extractor = new SymbolGraphExtractor(workspace);
+            
+            // Extract symbol graph
+            var result = await extractor.ExtractSymbolGraphAsync(
+                systemPath, 
+                scope, 
+                includeInheritance, 
+                includeMethodCalls, 
+                includeFieldAccess, 
+                includeNamespaces, 
+                maxDepth);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return JsonSerializer.Serialize(result, options);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in ExtractSymbolGraph: {ex.Message}");
+            Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                Console.Error.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                Console.Error.WriteLine($"Inner stack trace: {ex.InnerException.StackTrace}");
+            }
+            return $"Error extracting symbol graph: {ex.Message}";
         }
     }
 }

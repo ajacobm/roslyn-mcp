@@ -10,8 +10,17 @@ A Model Context Protocol (MCP) server that provides C# code analysis capabilitie
 - **Code Analyzer Support**: Run Microsoft recommended code analyzers
 
 ## Tools
+
+### Core Analysis Tools
 - `ValidateFile`: Validates a C# file using Roslyn and runs code analyzers
+- `ExtractProjectMetadata`: Extracts comprehensive metadata from .NET projects including types, members, namespaces, and dependencies
 - `FindUsages`: Finds all references to a symbol at a specified position
+
+### Advanced Analysis Tools
+- `ChunkCodeBySemantics`: Breaks down C# code into semantically meaningful chunks for analysis
+- `AnalyzeCodeStructure`: Analyzes architectural patterns, metrics, and code smells
+- `GenerateCodeFacts`: Extracts factual information about code for documentation and analysis
+- `ExtractSymbolGraph`: Creates a comprehensive graph representation of symbols and their relationships within C# code
 
 ## Example config
 ```json
