@@ -61,6 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Real-world usage scenarios
   - Best practices and troubleshooting
   - Integration with development workflows
+- **ASSUMPTIONS.md**: Critical assumptions and naming conventions documentation
+  - File naming conventions for MVVM pattern detection
+  - SQL detection patterns and requirements
+  - XAML structure assumptions
+  - Directory structure expectations
+  - Breaking changes and workarounds
+  - Validation checklist for accurate analysis
 - **Updated README.md**: Added multi-language capabilities overview
   - New tool descriptions and examples
   - Supported technologies and frameworks

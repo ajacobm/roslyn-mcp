@@ -84,6 +84,8 @@ For detailed Docker setup instructions, see [DOCKER.md](DOCKER.md).
 
 For comprehensive multi-language analysis examples and best practices, see [MULTI_LANGUAGE_GUIDE.md](MULTI_LANGUAGE_GUIDE.md).
 
+For important assumptions and naming conventions that affect analysis accuracy, see [ASSUMPTIONS.md](ASSUMPTIONS.md).
+
 ## Requirements
 
 ### Local Development
