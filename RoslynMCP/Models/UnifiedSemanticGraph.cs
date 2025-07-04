@@ -100,7 +100,7 @@ public class SemanticSymbolNode
     public string FullName { get; set; } = string.Empty;
     public SymbolKind Kind { get; set; }
     public string TypeName { get; set; } = string.Empty;
-    public Location? Location { get; set; } // Use Roslyn's native Location
+    public SymbolLocation? Location { get; set; } // Use custom SymbolLocation for graph compatibility
     public Accessibility Accessibility { get; set; }
     public List<string> Modifiers { get; set; } = new();
     
@@ -137,7 +137,7 @@ public class SemanticRelationship
     public string TargetSymbolId { get; set; } = string.Empty;
     public SemanticRelationshipType Type { get; set; }
     public string Label { get; set; } = string.Empty;
-    public Location? Location { get; set; } // Use Roslyn's native Location
+    public SymbolLocation? Location { get; set; } // Use custom SymbolLocation for graph compatibility
     public double Strength { get; set; } = 1.0; // Relationship strength (0.0 - 1.0)
     public Dictionary<string, object> Properties { get; set; } = new();
     

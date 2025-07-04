@@ -15,7 +15,7 @@ public class LanguageComponent
     public string Language { get; set; } = string.Empty; // "CSharp", "XAML", "SQL"
     public string FilePath { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
-    public Location Location { get; set; } = new();
+    public SymbolLocation Location { get; set; } = new();
     public ComponentRole Role { get; set; }
     public Dictionary<string, object> LanguageSpecificMetadata { get; set; } = new();
 }
@@ -30,7 +30,7 @@ public class MultiLanguageChunkingResult : ChunkingResult
 public class MultiLanguageChunkingMetadata : ChunkingMetadata
 {
     public Dictionary<string, int> LanguageDistribution { get; set; } = new();
-    public Dictionary<string, int> ChunkTypeDistribution { get; set; } = new();
+    public new Dictionary<string, int> ChunkTypeDistribution { get; set; } = new();
     public int CrossLanguageRelationships { get; set; }
     public List<string> SupportedLanguages { get; set; } = new();
 }

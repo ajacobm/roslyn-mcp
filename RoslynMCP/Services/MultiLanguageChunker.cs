@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using RoslynMCP.Models;
+using RoslynMCP.Utils;
 using System.Text;
 
 namespace RoslynMCP.Services;
@@ -182,14 +183,14 @@ public class MultiLanguageChunker
                         Language = "SQL",
                         FilePath = file,
                         Content = query.Content,
-                        Location = new Models.Location
+                        Location = LocationConverter.ToSymbolLocation(new Models.Location
                         {
                             FilePath = query.Location.FilePath,
                             StartLine = query.Location.Line,
                             EndLine = query.Location.EndLine,
                             StartColumn = query.Location.Column,
                             EndColumn = query.Location.EndColumn
-                        },
+                        }),
                         Role = ComponentRole.Query,
                         LanguageSpecificMetadata = new Dictionary<string, object>
                         {
@@ -324,7 +325,7 @@ public class MultiLanguageChunker
             Language = "CSharp",
             FilePath = filePath,
             Content = content,
-            Location = new Models.Location { FilePath = filePath, StartLine = 1, EndLine = content.Split('\n').Length },
+            Location = LocationConverter.ToSymbolLocation(new Models.Location { FilePath = filePath, StartLine = 1, EndLine = content.Split('\n').Length }),
             Role = DetermineCSharpRole(filePath, content)
         };
 
@@ -368,7 +369,7 @@ public class MultiLanguageChunker
             Language = "XAML",
             FilePath = filePath,
             Content = content,
-            Location = new Models.Location { FilePath = filePath, StartLine = 1, EndLine = content.Split('\n').Length },
+            Location = LocationConverter.ToSymbolLocation(new Models.Location { FilePath = filePath, StartLine = 1, EndLine = content.Split('\n').Length }),
             Role = DetermineXamlRole(filePath, content)
         };
 
@@ -616,7 +617,9 @@ public class MultiLanguageChunker
     {
         // Return the location of the first component, or create a default
         var primaryComponent = components.FirstOrDefault();
-        return primaryComponent?.Location ?? new Models.Location();
+        return primaryComponent?.Location != null 
+            ? LocationConverter.ToLocation(primaryComponent.Location) 
+            : new Models.Location();
     }
 
     private Dictionary<string, object> AnalyzeFeatureMetadata(List<LanguageComponent> components)

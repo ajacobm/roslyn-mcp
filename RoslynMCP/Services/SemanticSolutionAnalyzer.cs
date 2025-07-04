@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.MSBuild;
 using RoslynMCP.Models;
+using RoslynMCP.Utils;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -529,8 +530,8 @@ public class SemanticSolutionAnalyzer
                     CrossProjectReferences = projectRelationships.Count(r => r.IsCrossProject),
                     AverageComplexity = projectNodes.Any() ? projectNodes.Average(n => n.Metrics.CyclomaticComplexity) : 0.0,
                     LanguageDistribution = projectNodes
-                        .Where(n => n.Location?.SourceTree?.FilePath != null)
-                        .GroupBy(n => GetLanguageFromPath(n.Location.SourceTree.FilePath))
+                        .Where(n => n.Location?.File != null)
+                        .GroupBy(n => GetLanguageFromPath(n.Location.File))
                         .ToDictionary(g => g.Key, g => g.Count())
                 }
             };
@@ -557,7 +558,7 @@ public class SemanticSolutionAnalyzer
             FullName = symbol.ToDisplayString(),
             Kind = symbol.Kind,
             TypeName = GetTypeName(symbol),
-            Location = location,
+            Location = LocationConverter.ToSymbolLocation(location),
             Accessibility = symbol.DeclaredAccessibility,
             Modifiers = GetModifiers(symbol),
             ProjectId = project.Id.ToString(),
@@ -582,7 +583,7 @@ public class SemanticSolutionAnalyzer
             TargetSymbolId = targetId,
             Type = type,
             Label = type.ToString(),
-            Location = location, // Use Roslyn's native Location directly
+            Location = LocationConverter.ToSymbolLocation(location),
             IsCrossProject = IsCrossProjectRelationship(sourceId, targetId),
             IsCrossLanguage = IsCrossLanguageRelationship(sourceId, targetId)
         };
@@ -746,11 +747,11 @@ public class SemanticSolutionAnalyzer
         var sourceNode = _nodes.GetValueOrDefault(sourceId);
         var targetNode = _nodes.GetValueOrDefault(targetId);
         
-        if (sourceNode?.Location?.SourceTree?.FilePath == null || targetNode?.Location?.SourceTree?.FilePath == null)
+        if (sourceNode?.Location?.File == null || targetNode?.Location?.File == null)
             return false;
             
-        var sourceLanguage = GetLanguageFromPath(sourceNode.Location.SourceTree.FilePath);
-        var targetLanguage = GetLanguageFromPath(targetNode.Location.SourceTree.FilePath);
+        var sourceLanguage = GetLanguageFromPath(sourceNode.Location.File);
+        var targetLanguage = GetLanguageFromPath(targetNode.Location.File);
         
         return sourceLanguage != targetLanguage;
     }
@@ -1079,12 +1080,12 @@ public class FeatureBoundaryDetector
         return totalPossibleRelationships > 0 ? (double)crossFeatureRelationships / totalPossibleRelationships : 0.0;
     }
 
-    private string GetNamespaceFromLocation(Microsoft.CodeAnalysis.Location? location)
+    private string GetNamespaceFromLocation(SymbolLocation? location)
     {
-        if (location?.SourceTree == null) return "Unknown";
+        if (location?.File == null) return "Unknown";
         
         // Try to extract namespace from the file path or use a default approach
-        var filePath = location.SourceTree.FilePath;
+        var filePath = location.File;
         if (string.IsNullOrEmpty(filePath)) return "Unknown";
         
         // Simple heuristic: extract from file path structure
