@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -12,6 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
+using RoslynMCP.Models;
+using RoslynMCP.Services;
 
 class Program
 {
@@ -86,7 +89,7 @@ class Program
             directory = directory.Parent;
         }
 
-        return null;
+        return string.Empty;
     }
 
     public static async Task ValidateFileInProjectContextAsync(string filePath, string projectPath,
@@ -600,6 +603,89 @@ public static class RoslynTools
         }
     }
 
+    [McpServerTool, Description("Extract comprehensive metadata from a .NET project including types, members, namespaces, and dependencies. Returns structured JSON data suitable for embedding and semantic search.")]
+    public static async Task<string> ExtractProjectMetadata(
+        [Description("Path to the .csproj file or a file within the project")] string projectPath)
+    {
+        try
+        {
+            Console.Error.WriteLine($"ExtractProjectMetadata called with path: '{projectPath}'");
+
+            // Check if the input is null or empty
+            if (string.IsNullOrWhiteSpace(projectPath))
+            {
+                Console.Error.WriteLine("Project path is null or empty");
+                return "Error: Project path cannot be empty.";
+            }
+
+            // Normalize the path
+            string normalizedPath = projectPath.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            Console.Error.WriteLine($"System path: '{systemPath}'");
+
+            // Determine if this is a project file or a source file
+            string actualProjectPath;
+            if (systemPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            {
+                // It's already a project file
+                if (!File.Exists(systemPath))
+                {
+                    return $"Error: Project file {systemPath} does not exist.";
+                }
+                actualProjectPath = systemPath;
+            }
+            else
+            {
+                // It might be a source file, find the containing project
+                Console.Error.WriteLine("Searching for containing project...");
+                actualProjectPath = await Program.FindContainingProjectAsync(systemPath);
+                if (string.IsNullOrEmpty(actualProjectPath))
+                {
+                    return "Error: Couldn't find a project file. Please provide a .csproj file path or a file within a project.";
+                }
+            }
+
+            Console.Error.WriteLine($"Using project file: '{actualProjectPath}'");
+
+            // Create workspace and extractor
+            var workspace = CreateWorkspace();
+            var extractor = new ProjectMetadataExtractor(workspace);
+
+            // Extract metadata
+            Console.Error.WriteLine("Extracting project metadata...");
+            var metadata = await extractor.ExtractAsync(actualProjectPath);
+
+            // Serialize to JSON with proper formatting
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            var jsonResult = JsonSerializer.Serialize(metadata, options);
+            Console.Error.WriteLine("Metadata extraction complete");
+
+            return jsonResult;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ERROR in ExtractProjectMetadata: {ex.Message}");
+            Console.Error.WriteLine($"Exception type: {ex.GetType().FullName}");
+            Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                Console.Error.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                Console.Error.WriteLine($"Inner stack trace: {ex.InnerException.StackTrace}");
+            }
+
+            return $"Error extracting project metadata: {ex.Message}";
+        }
+    }
+
     [McpServerTool, Description("Find all references to a symbol at the specified position.")]
     public static async Task<string> FindUsages(
         [Description("Path to the file")] string filePath,
@@ -809,7 +895,3 @@ public static class EchoTool
     [McpServerTool, Description("Echoes the message back to the client.")]
     public static string Echo(string message) => $"hello {message}";
 }
-
-
-
-

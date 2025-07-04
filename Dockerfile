@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Roslyn MCP Server
 # Stage 1: Build the application
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 # Set working directory
 WORKDIR /src
@@ -22,7 +22,7 @@ RUN dotnet build RoslynMCP/RoslynMCP.csproj -c Release --no-restore
 RUN dotnet publish RoslynMCP/RoslynMCP.csproj -c Release --no-build -o /app/publish
 
 # Stage 2: Runtime image with MSBuild support
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS runtime
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS runtime
 
 # Install additional dependencies that might be needed
 RUN apt-get update && apt-get install -y \
