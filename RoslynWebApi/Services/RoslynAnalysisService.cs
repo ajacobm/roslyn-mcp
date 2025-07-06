@@ -1,8 +1,9 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.Caching.Memory;
 using RoslynRuntime;
 using RoslynRuntime.Services;
-using Microsoft.Extensions.Caching.Memory;
-using System.Text.Json;
 using System.Diagnostics;
+using System.Text.Json;
 
 namespace RoslynWebApi.Services;
 
@@ -34,6 +35,8 @@ public interface IRoslynAnalysisService
 /// </summary>
 public class RoslynAnalysisService : IRoslynAnalysisService
 {
+    private static readonly ILoggerFactory _loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
+        builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
     private readonly ILogger<RoslynAnalysisService> _logger;
     private readonly IMemoryCache _cache;
 
@@ -256,7 +259,35 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("ChunkCodeBySemanticsAsync called with path: '{Path}', strategy: '{Strategy}'", path, strategy);
-            
+
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                _logger.LogError("File does not exist: '{SystemPath}'", systemPath);
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create chunker service
+            var chunker = new CodeChunker();
+
+            // Perform chunking
+            var result = await chunker.ChunkCodeAsync(systemPath, strategy, includeDependencies);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            _logger.LogInformation("Code chunking completed for '{Path}' with strategy '{Strategy}'", systemPath, strategy);
+
             // This would delegate to the actual service implementation
             return await Task.FromResult($"Code chunking with strategy '{strategy}' completed for path: {path}");
         }
@@ -272,7 +303,34 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("AnalyzeCodeStructureAsync called with path: '{Path}'", path);
-            return await Task.FromResult($"Code structure analysis completed for path: {path}");
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                _logger.LogError("File does not exist: '{SystemPath}'", systemPath);
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create structure analyzer service
+            var analyzer = new StructureAnalyzer();
+
+            // Perform analysis
+            var result = await analyzer.AnalyzeStructureAsync(systemPath, detectPatterns, calculateMetrics);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            _logger.LogInformation("Code structure analysis completed for '{Path}'", systemPath);
+            return await Task.FromResult(JsonSerializer.Serialize(result, options));
         }
         catch (Exception ex)
         {
@@ -286,7 +344,35 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("GenerateCodeFactsAsync called with path: '{Path}', format: '{Format}'", path, format);
-            return await Task.FromResult($"Code facts generation completed for path: {path}");
+
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                _logger.LogError("File does not exist: '{SystemPath}'", systemPath);
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create code facts generator service
+            var generator = new CodeFactsGenerator();
+
+            // Generate facts
+            var result = await generator.GenerateCodeFactsAsync(systemPath, format, includeDescriptions);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            _logger.LogInformation("Code facts generation completed for '{Path}' in format '{Format}'", systemPath, format);
+            return await Task.FromResult(JsonSerializer.Serialize(result, options));
         }
         catch (Exception ex)
         {
@@ -302,7 +388,99 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("ExtractSymbolGraphAsync called with path: '{Path}', scope: '{Scope}'", path, scope);
-            return await Task.FromResult($"Symbol graph extraction completed for path: {path}");
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            // Validate scope parameter
+            var validScopes = new[] { "file", "project", "solution" };
+            if (!validScopes.Contains(scope.ToLowerInvariant()))
+            {
+                return $"Error: Invalid scope '{scope}'. Valid values are: {string.Join(", ", validScopes)}";
+            }
+
+            // For file scope, check if file exists
+            if (scope.ToLowerInvariant() == "file" && !File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // For project scope, check if it's a project file or find containing project
+            if (scope.ToLowerInvariant() == "project")
+            {
+                if (!systemPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Try to find containing project
+                    var projectPath = await RoslynHelpers.FindContainingProjectAsync(systemPath, _logger);
+                    if (string.IsNullOrEmpty(projectPath))
+                    {
+                        return "Error: Could not find a project file. Please provide a .csproj file path or a file within a project.";
+                    }
+                    systemPath = projectPath;
+                }
+                else if (!File.Exists(systemPath))
+                {
+                    return $"Error: Project file {systemPath} does not exist.";
+                }
+            }
+
+            // For solution scope, check if it's a solution file or find containing solution
+            if (scope.ToLowerInvariant() == "solution")
+            {
+                if (!systemPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Try to find solution file in directory hierarchy
+                    var directory = new DirectoryInfo(Path.GetDirectoryName(systemPath) ?? ".");
+                    string? solutionPath = null;
+
+                    while (directory != null)
+                    {
+                        var solutionFiles = directory.GetFiles("*.sln");
+                        if (solutionFiles.Length > 0)
+                        {
+                            solutionPath = solutionFiles[0].FullName;
+                            break;
+                        }
+                        directory = directory.Parent;
+                    }
+
+                    if (solutionPath == null)
+                    {
+                        return "Error: Could not find a solution file. Please provide a .sln file path or ensure you're within a solution directory.";
+                    }
+                    systemPath = solutionPath;
+                }
+                else if (!File.Exists(systemPath))
+                {
+                    return $"Error: Solution file {systemPath} does not exist.";
+                }
+            }
+
+            // Create workspace and symbol graph extractor
+            var workspace = RoslynHelpers.CreateWorkspace(_logger);
+            var extractor = new SymbolGraphExtractor(workspace);
+
+            // Extract symbol graph
+            var result = await extractor.ExtractSymbolGraphAsync(
+                systemPath,
+                scope,
+                includeInheritance,
+                includeMethodCalls,
+                includeFieldAccess,
+                includeNamespaces,
+                maxDepth);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return await Task.FromResult(JsonSerializer.Serialize(result, options));
         }
         catch (Exception ex)
         {
@@ -317,7 +495,34 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("ChunkMultiLanguageCodeAsync called with path: '{Path}', strategy: '{Strategy}'", path, strategy);
-            return await Task.FromResult($"Multi-language chunking completed for path: {path}");
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            // Validate strategy parameter
+            var validStrategies = new[] { "feature", "dataaccess", "mvvm", "component" };
+            if (!validStrategies.Contains(strategy.ToLowerInvariant()))
+            {
+                return $"Error: Invalid strategy '{strategy}'. Valid values are: {string.Join(", ", validStrategies)}";
+            }
+
+            // Create multi-language chunker service
+            var chunker = new MultiLanguageChunker();
+
+            // Perform chunking
+            var result = await chunker.ChunkMultiLanguageCodeAsync(systemPath, strategy, includeDependencies, includeXaml, includeSql);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return await Task.FromResult(JsonSerializer.Serialize(result, options));
         }
         catch (Exception ex)
         {
@@ -332,7 +537,89 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("ExtractUnifiedSemanticGraphAsync called with path: '{Path}'", path);
-            return await Task.FromResult($"Unified semantic graph extraction completed for path: {path}");
+            // Normalize file path
+            string normalizedPath = path.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            // Determine if this is a solution or project file
+            bool isSolutionFile = systemPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase);
+            bool isProjectFile = systemPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase);
+
+            if (!isSolutionFile && !isProjectFile)
+            {
+                // Try to find solution or project file
+                var directory = new DirectoryInfo(Path.GetDirectoryName(systemPath) ?? ".");
+                string? foundPath = null;
+
+                // First try to find solution file
+                while (directory != null)
+                {
+                    var solutionFiles = directory.GetFiles("*.sln");
+                    if (solutionFiles.Length > 0)
+                    {
+                        foundPath = solutionFiles[0].FullName;
+                        isSolutionFile = true;
+                        break;
+                    }
+                    directory = directory.Parent;
+                }
+
+                // If no solution found, try to find project file
+                if (foundPath == null)
+                {
+                    var projectPath = await RoslynHelpers.FindContainingProjectAsync(systemPath, _logger);
+                    if (!string.IsNullOrEmpty(projectPath))
+                    {
+                        foundPath = projectPath;
+                        isProjectFile = true;
+                    }
+                }
+
+                if (foundPath == null)
+                {
+                    return "Error: Could not find a solution (.sln) or project (.csproj) file. Please provide a valid solution or project file path.";
+                }
+
+                systemPath = foundPath;
+            }
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create workspace and semantic analyzer
+            var workspace = RoslynHelpers.CreateWorkspace(_logger);
+            var analyzerLogger = _loggerFactory.CreateLogger<SemanticSolutionAnalyzer>();
+            var analyzer = new SemanticSolutionAnalyzer(workspace, analyzerLogger);
+
+            Solution solution;
+            if (isSolutionFile)
+            {
+                // Open solution
+                solution = await workspace.OpenSolutionAsync(systemPath);
+            }
+            else
+            {
+                // Open project and get its solution
+                var project = await workspace.OpenProjectAsync(systemPath);
+                solution = project.Solution;
+            }
+
+            // Extract unified semantic graph
+            var result = await analyzer.AnalyzeSolutionAsync(solution);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return await Task.FromResult(JsonSerializer.Serialize(result, options));
         }
         catch (Exception ex)
         {
@@ -346,7 +633,32 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("ExtractSqlFromCodeAsync called with path: '{FilePath}'", filePath);
-            return await Task.FromResult($"SQL extraction completed for file: {filePath}");
+            // Normalize file path
+            string normalizedPath = filePath.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            // Create SQL extractor service
+            var extractor = new SqlExtractor();
+
+            // Extract SQL metadata
+            var result = await extractor.ExtractSqlFromFileAsync(systemPath);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return await Task.FromResult(JsonSerializer.Serialize(result, options));
         }
         catch (Exception ex)
         {
@@ -360,7 +672,38 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("AnalyzeXamlFileAsync called with path: '{FilePath}'", filePath);
-            return await Task.FromResult($"XAML analysis completed for file: {filePath}");
+            // Normalize file path
+            string normalizedPath = filePath.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            if (!File.Exists(systemPath))
+            {
+                return $"Error: File {systemPath} does not exist.";
+            }
+
+            if (!systemPath.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"Error: File {systemPath} is not a XAML file.";
+            }
+
+            // Create XAML analyzer service
+            var xamlLogger = _loggerFactory.CreateLogger<XamlAnalyzer>();
+            var analyzer = new XamlAnalyzer(xamlLogger);
+
+            // Analyze XAML file
+            var result = await analyzer.AnalyzeXamlFileAsync(systemPath);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return await Task.FromResult(JsonSerializer.Serialize(result, options));
         }
         catch (Exception ex)
         {
@@ -374,7 +717,48 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         try
         {
             _logger.LogInformation("AnalyzeMvvmRelationshipsAsync called with path: '{ProjectPath}'", projectPath);
-            return await Task.FromResult($"MVVM analysis completed for project: {projectPath}");
+            // Normalize file path
+            string normalizedPath = projectPath.Replace("\\", "/");
+            string systemPath = !Path.IsPathRooted(normalizedPath)
+                ? Path.GetFullPath(normalizedPath)
+                : Path.GetFullPath(normalizedPath);
+
+            // Determine if this is a project file or a source file
+            string actualProjectPath;
+            if (systemPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!File.Exists(systemPath))
+                {
+                    return $"Error: Project file {systemPath} does not exist.";
+                }
+                actualProjectPath = systemPath;
+            }
+            else
+            {
+                // Try to find containing project
+                actualProjectPath = await RoslynHelpers.FindContainingProjectAsync(systemPath, _logger);
+                if (string.IsNullOrEmpty(actualProjectPath))
+                {
+                    return "Error: Could not find a project file. Please provide a .csproj file path or a file within a project.";
+                }
+            }
+
+            // Create XAML analyzer service
+            var xamlLogger = _loggerFactory.CreateLogger<XamlAnalyzer>();
+            var analyzer = new XamlAnalyzer(xamlLogger);
+
+            // Analyze MVVM relationships
+            var result = await analyzer.AnalyzeMvvmRelationshipsAsync(actualProjectPath);
+
+            // Serialize to JSON
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            };
+
+            return await Task.FromResult(JsonSerializer.Serialize(result, options));
         }
         catch (Exception ex)
         {
