@@ -12,8 +12,10 @@
       <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
       <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.13.0" />
       <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.13.0" />
-      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.4" />
-      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.7" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.7" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.7" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.7" />
       <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.13" />
       
       <!-- Modern Logging Dependencies -->
@@ -28,6 +30,10 @@
       <!-- PackageReference Include="System.Xaml" Version="8.0.0" /-->
       <PackageReference Include="Portable.Xaml" Version="0.26.0" />
       <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="161.8905.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\RoslynRuntime\RoslynRuntime.csproj" />
     </ItemGroup>
 
 </Project>

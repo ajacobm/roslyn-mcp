@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.13.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.13.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.13.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.7" />
+
+    <!-- Modern Logging Dependencies -->
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+
+    <!-- Multi-Language Analysis Dependencies -->
+    <!-- PackageReference Include="System.Xaml" Version="8.0.0" /-->
+    <PackageReference Include="Portable.Xaml" Version="0.26.0" />
+    <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="161.8905.0" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Folder Include="Models\" />
+    <Folder Include="Utils\" />
+    <Folder Include="Services\Logging\" />
+  </ItemGroup>
+
+</Project>
